@@ -1,0 +1,727 @@
+<h1>   # Content Analysis, topic modelling, keyword extractor  </h1>
+
+
+<pre>
+import nltk
+import pandas as pd
+import gensim
+from gensim import corpora
+from gensim.models import LdaModel
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from collections import Counter
+
+# Read data from CSV file
+df = pd.read_csv('/content/drive/MyDrive/SMA_datasets_prac_exam/social_media_data.csv')
+
+# nltk.download('stopwords')
+# nltk.download('wordnet')
+# nltk.download('punkt')
+
+# Tokenization, stopword removal, and lemmatization
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+
+def preprocess_text(text):
+    tokens = word_tokenize(text.lower())
+    filtered_tokens = [lemmatizer.lemmatize(token) for token in tokens if token.isalnum() and token not in stop_words]
+    return filtered_tokens
+
+df['tokens'] = df['text'].apply(preprocess_text)
+
+# Create dictionary and document-term matrix
+dictionary = corpora.Dictionary(df['tokens'])
+corpus = [dictionary.doc2bow(tokens) for tokens in df['tokens']]
+
+# Topic modeling using LDA
+num_topics = 5  # Adjust the number of topics as needed
+lda_model = LdaModel(corpus, num_topics=num_topics, id2word=dictionary, passes=20)
+
+# Print topics
+print("Topics:")
+for topic_id in range(num_topics):
+    print(f"Topic {topic_id + 1}: {lda_model.print_topic(topic_id)}")
+
+# Keyword extraction
+all_tokens = [token for tokens in df['tokens'] for token in tokens]
+keyword_counter = Counter(all_tokens)
+
+# Print most common keywords
+num_keywords = 10  # Adjust the number of keywords as needed
+print("\nTop Keywords:")
+for keyword, count in keyword_counter.most_common(num_keywords):
+    print(f"{keyword}: {count}")
+
+# Display topics in a structured format
+print("Identified Topics from LDA:")
+for idx in range(num_topics):
+    topic_info = lda_model.print_topic(idx, topn=10)  # Get the top 10 terms per topic
+    topic_number = idx + 1
+    words_and_weights = topic_info.split(" + ")
+    print(f"\nTopic {topic_number}:")
+    for item in words_and_weights:
+        weight, word = item.split("*")
+        print(f"  - {word.strip()} (Weight: {weight.strip()})")
+
+# visualization
+for idx, topic in enumerate(lda_model.show_topics(num_topics, formatted=False)):
+    topic_terms = [term[0] for term in topic[1]]
+    term_weights = [term[1] for term in topic[1]]
+
+    plt.figure()
+    plt.bar(topic_terms, term_weights, color='skyblue')
+    plt.title(f"Topic {idx + 1}")
+    plt.xlabel("Terms")
+    plt.ylabel("Weights")
+    plt.show()
+</pre>
+
+
+
+<h1>  # Location analysis   </h1>
+
+<pre>
+!pip install pandas matplotlib seaborn
+
+import pandas as pd
+import re # optional
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the tweet data from CSV
+tweet_data = pd.read_csv('tweet_data.csv')
+
+# List of keywords to approximate locations
+location_keywords = [
+    'New York', 'London', 'Paris', 'Tokyo', 'Los Angeles', 'Berlin',
+    'Chicago', 'San Francisco', 'Dubai', 'Toronto', 'Boston', 'Portland', 'Denver'
+]
+
+# Function to find keywords in text
+def find_locations(text, keywords):
+    found_locations = []
+    tweet_words = text.split()
+    # Search for keywords in the text (case-insensitive)
+    for keyword in keywords:
+        # regular expression method:
+        # if re.search(rf'\b{re.escape(keyword)}\b', text, re.IGNORECASE):
+        #     found_locations.append(keyword)
+        if keyword in tweet_words:
+            found_locations.append(keyword)
+    return found_locations
+
+
+# Extract all locations from tweets using the keyword list
+all_locations = []
+for tweet in tweet_data['text']:  # Adjust column name as needed
+    locations = find_locations(tweet, location_keywords)
+    all_locations.extend(locations)
+
+# Create a DataFrame from the extracted locations
+locations_df = pd.DataFrame(all_locations, columns=['Location'])
+
+# Count the frequency of each location using value_counts
+location_counts = locations_df['Location'].value_counts()
+print(location_counts)
+
+# sort
+location_counts = location_counts.sort_values(ascending=False)
+
+# Get the top 10 most mentioned locations
+top_locations = location_counts.head(10)
+print(top_locations)
+
+# Convert to a DataFrame for easier plotting
+top_locations_df = top_locations.reset_index()
+top_locations_df.columns = ['Location', 'Count']
+
+# Plotting the top locations
+plt.figure(figsize=(10, 6))
+sns.barplot(x='Count', y='Location', data=top_locations_df, palette="viridis")
+plt.xlabel('Number of Mentions')
+plt.ylabel('Location')
+plt.title('Top Locations Mentioned in Tweets')
+plt.show()
+
+</pre>
+
+
+
+<h1>    # Trend analysis    </h1>
+
+<pre>
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv(f"supermarket_sales - Sheet1.csv")
+df.head()
+
+df['Date'] = pd.to_datetime(df['Date'])
+df.head(2)
+
+data = df.loc[df['City'] == 'Yangon']
+r_col = ['Invoice ID', 'Branch', 'City', 'Customer type', 'Gender',
+       'Product line', 'Unit price', 'Quantity', 'Tax 5%',
+       'Time', 'Payment', 'cogs', 'gross margin percentage', 'gross income',
+       'Rating',]
+
+
+data.drop(r_col, axis =1 , inplace=True)
+data.head()
+data2 = data.copy()
+
+data = data[["Date","Total"]]
+data = data.sort_values('Date')
+data.set_index('Date', inplace=True)
+data.head()
+# df1=data
+
+data.plot(figsize=(15,6),legend=True)
+plt.ylabel("Sales",fontsize=18)
+plt.xlabel("Date",fontsize=18)
+plt.title("Date Vs Sales",fontsize=20)
+plt.show()
+
+# print(data2.columns)
+data = data2
+
+# Extract year, month, day, hour, or any other relevant time component for analysis
+data['year'] = data['Date'].dt.year
+data['month'] = data['Date'].dt.month
+data['day'] = data['Date'].dt.day
+# data['hour'] = data['Date'].dt.hour
+
+data1 = data.copy()
+
+# Count the number of occurrences for each unique day
+data1 = data1["day"].value_counts()
+
+# Convert the count results to a DataFrame for plotting
+data1_df = data1.reset_index()
+data1_df.columns = ['day', 'count']
+data1_df = data1_df.sort_values('day')
+data1_df.set_index('day', inplace=True)
+
+data1_df.plot(figsize=(15,6), legend=True)
+plt.ylabel("Sales",fontsize=18)
+plt.xlabel("Days",fontsize=18)
+plt.title("Trend Analysis of Social Media Posts Over Days Vs Sales",fontsize=20)
+plt.show()
+
+
+# seaborn method
+
+# Plotting trends over time
+
+plt.figure(figsize=(12, 6))
+sns.countplot(x='day', data=data, palette="viridis")
+plt.xlabel('Day')
+plt.ylabel('Number of Posts')
+plt.title('Trend Analysis of Social Media Posts Over Days')
+plt.show()
+
+</pre>
+
+
+<h1>   # Hashtag Analysis    </h1>
+
+
+<pre>
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.cluster import KMeans
+import numpy as np
+import seaborn as sns
+
+# Read data
+df = pd.read_csv('hashtag_analysis.csv')
+
+# Function to extract hashtags
+def extract_hashtags(text):
+    # Split by space and only take words that start with '#'
+    return ' '.join([word for word in text.split() if word.startswith('#')])
+
+# Apply the function to create a list of hashtags for each row
+df['hashtags_split'] = df['hashtags'].apply(extract_hashtags)
+
+# Use CountVectorizer to create a matrix of hashtag counts (Bag of Words)
+vectorizer = CountVectorizer()
+hashtag_matrix = vectorizer.fit_transform(df['hashtags_split'])
+
+# Number of clusters for K-means
+num_clusters = 5  # Adjust as desired
+
+# Apply K-means clustering
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+df['cluster'] = kmeans.fit_predict(hashtag_matrix)
+
+# Display cluster assignment
+print("Cluster assignments for each row:")
+print(df[['hashtags', 'cluster']])
+
+# Analyze hashtags in each cluster
+for cluster_num in range(num_clusters):
+    cluster_hashtags = []
+    # Collect hashtags for each cluster
+    cluster_data = df[df['cluster'] == cluster_num]['hashtags_split']
+    for text in cluster_data:
+        cluster_hashtags.extend(text.split())
+
+    unique_hashtags = np.unique(cluster_hashtags)
+    print(f"Cluster {cluster_num} Hashtags: {unique_hashtags}")
+
+
+# Function to count hashtag frequencies manually
+def count_hashtag_frequencies(data):
+    hashtag_count = {}
+    for text in data:
+        hashtags = text.split()
+        for hashtag in hashtags:
+            if hashtag in hashtag_count:
+                hashtag_count[hashtag] += 1
+            else:
+                hashtag_count[hashtag] = 1
+    return hashtag_count
+
+# Create a figure for the plots
+plt.figure(figsize=(15, 10))
+
+# Plot hashtag frequencies for each cluster
+for cluster_num in range(num_clusters):
+    cluster_data = df[df['cluster'] == cluster_num]['hashtags_split']
+    hashtag_frequencies = count_hashtag_frequencies(cluster_data)
+    
+    # Convert the dictionary to a DataFrame for plotting
+    hashtag_freq_df = pd.DataFrame(list(hashtag_frequencies.items()), columns=['Hashtag', 'Frequency'])
+    
+    # Sort by frequency
+    hashtag_freq_df = hashtag_freq_df.sort_values(by='Frequency', ascending=False)
+    
+    # Plot the top 10 hashtags for this cluster
+    plt.figure(figsize=(5 * num_clusters, 10))
+    plt.subplot(1, num_clusters, cluster_num + 1)
+    sns.barplot(data=hashtag_freq_df.head(10), x='Frequency', y='Hashtag', palette='muted')
+    plt.title(f'Cluster {cluster_num} Hashtags')
+    plt.xlabel('Frequency')
+    plt.ylabel('Hashtag')
+    # Display the plots
+    # plt.tight_layout()
+    plt.show()
+    
+</pre>
+
+
+
+<h1>   # Sentiment Analysis    </h1>
+
+
+<pre>
+
+import pandas as pd
+from textblob import TextBlob
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the dataset from CSV
+data = pd.read_csv('sentiment.csv')
+
+# Perform sentiment analysis using TextBlob
+data['polarity'] = data['text'].apply(lambda x: TextBlob(x).sentiment.polarity)
+
+# Categorize tweets into positive, negative, and neutral based on polarity
+data['sentiment'] = data['polarity'].apply(lambda x: 'positive' if x > 0.1 else ('negative' if x < -0.1 else 'neutral'))
+
+# print(data)
+# Count the number of positive, negative, and neutral tweets
+sentiment_counts = data['sentiment'].value_counts()
+
+# Plotting the sentiment analysis
+plt.figure(figsize=(8, 6))
+sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, palette="viridis")
+plt.xlabel('Sentiment')
+plt.ylabel('Number of Tweets')
+plt.title('Sentiment Analysis')
+plt.show()
+
+# Separate positive and negative tweets
+positive_tweets = data[data['sentiment'] == 'positive']
+negative_tweets = data[data['sentiment'] == 'negative']
+neutral_tweets = data[data['sentiment'] == 'neutral']
+
+# Print a few positive tweets
+print("Positive Tweets:")
+for tweet in positive_tweets['text'].head():
+    print("-", tweet)
+
+# Print a few negative tweets
+print("\nNegative Tweets:")
+for tweet in negative_tweets['text'].head():
+    print("-", tweet)
+
+# Print a few neutral tweets
+print("\nNegative Tweets:")
+for tweet in neutral_tweets['text'].head():
+    print("-", tweet)
+
+
+# Plot the distribution of polarity scores for positive and negative tweets
+# A kernel density estimate (KDE) plot is a method for visualizing the distribution of observations in a dataset, analogous to a histogram.
+sns.kdeplot(positive_tweets["polarity"], shade=True, label="Positive")
+sns.kdeplot(negative_tweets["polarity"], shade=True, label="Negative")
+sns.kdeplot(neutral_tweets["polarity"], shade=True, label="Neutral")
+plt.xlabel("Polarity Score")
+plt.ylabel("Density")
+plt.title("Sentiment Analysis of Tweets")
+plt.legend()
+plt.show()
+    
+</pre>
+
+
+
+<h1>  # User Engagement Analysis     </h1>
+
+
+<pre>
+
+'''
+To analyze how users engage with content on Twitter and understand what types of content are most engaging, we will use the following libraries:
+
+pandas: for reading and manipulating the dataset
+seaborn and matplotlib: for data visualization
+nltk: for text processing
+textblob: for sentiment analysis
+wordcloud: for creating a word cloud of the most common words in the dataset
+Assuming that the dataset is in a CSV format with a "text" column containing the tweet text, a "retweets" column containing the number of retweets, a "favorites" column containing the number of favorites, and a "date" column containing the date and time of the tweet, the program can be written as follows:
+'''
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import nltk
+from nltk.corpus import stopwords
+from textblob import TextBlob
+from wordcloud import WordCloud
+
+# Read the dataset into a pandas DataFrame
+df = pd.read_csv("engagement.csv")
+
+print(df)
+
+df.head(10)
+
+df.info()
+
+df.describe()
+
+# Remove stop words from the tweet text
+# stop_words = set(stopwords.words("english"))
+# df["text"] = df["text"].apply(lambda x: " ".join(
+    # word for word in x.split() if word.lower() not in stop_words))
+
+# Perform sentiment analysis using TextBlob and store the polarity score
+df["polarity"] = df["text"].apply(lambda x: TextBlob(x).sentiment.polarity)
+
+# Create a scatter plot of retweets vs. favorites to see how users engage with the content
+sns.scatterplot(x="retweets", y="favorites", data=df)
+plt.xlabel("Retweets")
+plt.ylabel("Favorites")
+plt.title("Engagement Analysis of Tweets")
+plt.show()
+
+# Create a bar chart of the most common words in the tweet text
+wordcloud = WordCloud(background_color="white", max_words=50,
+                      contour_width=3, contour_color="steelblue")
+wordcloud.generate(" ".join(df["text"]))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis("off")
+plt.show()
+
+# Create a histogram of the polarity scores to see the distribution of sentiment in the dataset
+sns.histplot(data=df, x=df["polarity"], bins=20)
+plt.xlabel("Polarity Score")
+plt.ylabel("Count")
+plt.title("Sentiment Analysis of Tweets")
+plt.show()
+    
+</pre>
+
+
+
+
+<h1>   # EDA and visualization    </h1>
+
+
+<pre>
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+
+# Read dataset from CSV
+df = pd.read_csv(f'/content/drive/MyDrive/SMA_datasets_prac_exam/supermarket_sales - Sheet1.csv')
+
+# Convert the 'Date' column to datetime
+df['Date'] = pd.to_datetime(df['Date'])
+
+# Check the basic structure of the data
+print("Dataframe info:")
+print(df.info())
+print("\nDataframe head:")
+print(df.head())
+
+# Group data by date and calculate the sum of 'Total' for each date
+daily_sales = df.groupby('Date')['Total'].sum()
+
+# Plot the daily sales over time to detect trends
+plt.figure(figsize=(12, 6))
+plt.plot(daily_sales.index, daily_sales.values, marker='o', linestyle='-', color='b')
+plt.title("Daily Sales Trend")
+plt.xlabel("Date")
+plt.ylabel("Total Sales")
+plt.grid(True)
+plt.show()
+
+# daily sales using a boxplot
+plt.figure(figsize=(8, 6))
+sns.boxplot(x=daily_sales.values)
+plt.title("Boxplot of Daily Sales")
+plt.xlabel("Daily Total Sales")
+plt.show()
+
+# Calculate summary statistics for total sales
+summary_stats = daily_sales.describe()
+print("\nSummary Statistics for Daily Sales:")
+print(summary_stats)
+
+# Check for missing values in 'Total' and 'Date'
+missing_values = df[['Date', 'Total']].isnull().sum()
+print("\nMissing Values:")
+print(missing_values)
+
+# Scatter plot to detect outliers
+plt.figure(figsize=(12, 6))
+plt.scatter(daily_sales.index, daily_sales.values, color='b', alpha=0.7)
+plt.title("Scatter Plot of Daily Sales (Outliers Detection)")
+plt.xlabel("Date")
+plt.ylabel("Total Sales")
+plt.show()
+
+
+# Bar Graph: Daily Total Sales
+plt.figure(figsize=(12, 6))
+daily_sales.plot(kind='bar', color='teal')
+plt.title("Bar Graph of Daily Total Sales")
+plt.xlabel("Date")
+plt.ylabel("Total Sales")
+plt.show()
+
+# Histogram: Distribution of Total Sales
+plt.figure(figsize=(12, 6))
+sns.histplot(df['Total'], bins=20, kde=True, color='orange')
+plt.title("Histogram of Total Sales")
+plt.xlabel("Total Sales")
+plt.ylabel("Frequency")
+plt.show()
+    
+</pre>
+
+
+<h1>  # Brand Analysis    </h1>
+
+
+<pre>
+
+#Brand Analysis
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import nltk
+from wordcloud import WordCloud
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+nltk.download('stopwords') 
+nltk.download('wordnet')
+nltk.download('punkt')
+nltk.download('vader_lexicon')
+
+# Read data from CSV file
+df = pd.read_csv('/content/drive/MyDrive/SMA_datasets_prac_exam/tweets.csv')  # Replace 'your_dataset.csv' with your CSV file path
+
+# Text preprocessing
+stop_words = set(stopwords.words('english'))
+sia = SentimentIntensityAnalyzer()
+
+def preprocess_text(text):
+    tokens = word_tokenize(text.lower())
+    filtered_tokens = [token for token in tokens if token.isalnum() and token not in stop_words]
+    return filtered_tokens
+
+df['tokens'] = df['tweet'].apply(preprocess_text)
+df['sentiment'] = df['tweet'].apply(lambda x: sia.polarity_scores(x)['compound'])
+
+# Generate WordCloud
+all_text = ' '.join(df['tweet'])
+wordcloud = WordCloud(width=800, height=400, background_color='white', colormap='viridis').generate(all_text)
+
+# Plot WordCloud
+plt.figure(figsize=(10, 6))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.title('WordCloud of Brand Mentions')
+plt.show()
+
+# Sentiment Analysis
+average_sentiment = df['sentiment'].mean()
+print(f"Average sentiment of brand mentions: {average_sentiment:.2f}")
+    
+</pre>
+
+
+
+<h1>   # Competitor Analysis    </h1>
+
+
+<pre>
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from rake_nltk import Rake
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+# Read data from CSV file
+df = pd.read_csv('/content/drive/MyDrive/SMA_datasets_prac_exam/brand_data.csv')
+
+# Preprocessing and keyword extraction using RAKE
+r = Rake()
+stop_words = set(stopwords.words('english'))
+
+# Extract keywords for all posts
+df['keywords'] = df['text'].apply(lambda x: r.extract_keywords_from_text(x) or r.get_ranked_phrases())
+
+# Determine if a post mentions the brand or a competitor
+brand_keywords = []
+competitor_keywords = []
+
+for idx, row in df.iterrows():
+    for keyword in row['keywords']:
+        if 'brand' in keyword.lower():
+            brand_keywords.append(keyword)
+        else:
+            competitor_keywords.append(keyword)
+
+# Get the top keywords for brand and competitors
+brand_keyword_counts = Counter(brand_keywords).most_common(10)
+competitor_keyword_counts = Counter(competitor_keywords).most_common(10)
+
+# Bar plot for the top 10 keywords for brand and competitors
+plt.figure(figsize=(10, 6))
+brand_keywords, brand_counts = zip(*brand_keyword_counts)
+competitor_keywords, competitor_counts = zip(*competitor_keyword_counts)
+
+plt.bar(brand_keywords, brand_counts, color='blue', alpha=0.7, label='Brand')
+plt.bar(competitor_keywords, competitor_counts, color='red', alpha=0.7, label='Competitors')
+plt.xlabel('Keywords')
+plt.ylabel('Frequency')
+plt.title('Top Keywords for Brand vs Competitors')
+plt.legend()
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+plt.show()
+
+# Sentiment Analysis
+sia = SentimentIntensityAnalyzer()
+df['sentiment'] = df['text'].apply(lambda x: sia.polarity_scores(x)['compound'])
+
+# Plot sentiment distribution for competitors
+plt.figure(figsize=(10, 6))
+sns.histplot(df, x='sentiment',  multiple='stack', binwidth=0.2, palette='coolwarm')
+plt.xlabel("Sentiment")
+plt.ylabel("Frequency")
+plt.title("Sentiment Distribution by Competitors")
+plt.show()
+    
+</pre>
+
+
+
+
+<h1>  # Community Detection and Influencer Analysis     </h1>
+
+
+<pre>
+
+import pandas as pd
+import warnings
+import networkx as nx
+from networkx.algorithms import community
+import matplotlib.pyplot as plt
+warnings.filterwarnings('ignore')
+
+dataset = pd.read_csv('tweets.csv')
+dataset = dataset[dataset.user_location.notnull()][:10]
+dataset['hashtags'] = ''
+
+for i, row in dataset.iterrows():
+    hashtags = [token for token in row.tweet.split() if token.startswith('#')]
+    dataset['hashtags'][i] = hashtags
+
+dataset = dataset.explode('hashtags')
+users = list(dataset['user'].unique())
+hashtags = list(dataset['hashtags'].unique())
+
+vis = nx.Graph()
+vis.add_nodes_from(users + hashtags)
+
+for name, group in dataset.groupby(['hashtags', 'user']):
+    hashtag, user = name
+    weight = len(group)
+    vis.add_edge(hashtag, user, weight=weight)
+
+
+# Community Detection
+community_gen = community.girvan_newman(vis)
+top_level_communities = next(community_gen)
+
+communities = list(next(community_gen))
+print("Comm", communities)
+# colors = ['red', 'yellow', 'orange']
+# node_colors = {}
+
+# for i, comm in enumerate(communities):
+#     for node in comm:
+#         node_colors[node] = colors[i]
+
+# nx.set_node_attributes(vis, node_colors, name='color')
+# node_colors = nx.get_node_attributes(vis, 'color')
+# node_color=[node_colors[n] for n in vis.nodes]
+
+nx.draw(vis, with_labels=True, font_size=8)
+plt.axis('off')
+plt.show()
+
+
+# Influential Node Analysis
+centrality = nx.betweenness_centrality(vis)
+print('Top 5 Most Influential Users/Hashtags based on betweenness centrality :- ')
+influential_nodes = sorted(
+    centrality.items(), key=lambda item: item[1], reverse=True)[:5]
+
+for nodes in influential_nodes:
+    print(f'{nodes[0]} : {nodes[1]}')
+    
+</pre>
+
